@@ -43,5 +43,5 @@ The student dashboard will display a read-only list of all stock items and their
 HTML5 - For the document structure.\
 CSS3 - For styling the application.\
 JavaScript - For the application logic.\
-Firebase - Authentication and real-time \database.
+Firebase - Authentication and real-time database.\
 Tailwind CSS - A utility-first CSS framework for rapid UI development.
