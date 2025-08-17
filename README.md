@@ -3,7 +3,7 @@ The ASIET-Store is a modern web-based platform for Adi Shankara Institute of Eng
 
 ✨ Features
 
-Student Login: Students can securely log in to view the current stock of items.
+Student Login: Students can securely log in to view the current stock of items.\
 Admin Login: A dedicated admin account allows for full control over the stock.
 Real-time Stock View: The stock list updates instantly for all logged-in users when an admin makes a change.
 Admin Stock Management: Administrators can easily update the quantity of items in the store.
