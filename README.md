@@ -1,6 +1,5 @@
-ASIET Store: Stock Management System
-
-This is a simple, real-time web application for the ASIET college store, designed to help students and administrators manage and view store stock. The application features separate views and functionalities for students and administrators, powered by Firebase for secure authentication and a real-time database.
+# ASIET_STORE
+The ASIET-Store is a modern web-based platform for Adi Shankara Institute of Engineering and Technology. It features a secure, role-based access system using Firebase Authentication and Firestore, enabling students to view live product stock and authorized administrators to manage inventory on a dedicated dashboard.
 
 ✨ Features
 
