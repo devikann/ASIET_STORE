@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal - ASIET-Store</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .product-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            background-color: #2D3748; /* Darker card background */
+            color: #E2E8F0; /* Light text for contrast */
+        }
+        .product-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+        /* Style for loading spinner */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            animation: spin 1s linear infinite;
+            border-top-color: #6366F1; /* Indigo color for spinner */
+        }
+        .filter-section {
+            background-color: #2D3748; /* Darker filter background */
+        }
+        .header-bg {
+            background-color: #1A202C; /* Even darker header background */
+        }
+    </style>
+</head>
+<body class="bg-slate-900 p-4 min-h-screen text-slate-200">
+    <div class="max-w-7xl mx-auto">
+        <header class="header-bg shadow-lg rounded-lg p-6 mb-8 flex justify-between items-center border-b border-slate-700">
+            <h1 id="welcomeMessage" class="text-4xl font-bold">🎓 Student Portal - ASIET-Store</h1>
+            <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md">Logout</button>
+        </header>
+
+        <main>
+            <!-- Filter and Sort Section -->
+            <div class="filter-section p-6 rounded-lg shadow-md mb-8 flex flex-wrap items-center gap-6">
+                <div class="flex-1 min-w-[200px]">
+                    <label for="searchInput" class="block text-sm font-medium text-slate-400">Search Products</label>
+                    <input type="text" id="searchInput" placeholder="Search by name..." class="w-full mt-1 p-3 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white">
+                </div>
+                <div class="min-w-[150px]">
+                    <label for="stockFilter" class="block text-sm font-medium text-slate-400">Filter by Availability</label>
+                    <select id="stockFilter" class="w-full mt-1 p-3 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white">
+                        <option value="all">All Products</option>
+                        <option value="available">In Stock</option>
+                        <option value="out-of-stock">Out of Stock</option>
+                        <option value="low-stock">Low Stock</option>
+                    </select>
+                </div>
+                <div class="min-w-[150px]">
+                    <label for="sortBy" class="block text-sm font-medium text-slate-400">Sort by</label>
+                    <select id="sortBy" class="w-full mt-1 p-3 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white">
+                        <option value="price">Price (Low to High)</option>
+                        <option value="price-desc">Price (High to Low)</option>
+                        <option value="stock">Stock (Low to High)</option>
+                        <option value="stock-desc">Stock (High to Low)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Products Grid -->
+            <div class="products-section p-8 rounded-lg shadow-xl" style="background-color: #2D3748;">
+                <div class="flex justify-between items-center mb-6 border-b border-slate-600 pb-4">
+                    <h2 class="text-3xl font-bold text-slate-100">Available Products</h2>
+                    <span id="productCount" class="bg-indigo-600 text-white font-semibold px-5 py-2 rounded-full text-sm shadow-md">Loading...</span>
+                </div>
+                <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    <div id="loadingIndicator" class="col-span-full flex flex-col items-center justify-center p-12 text-slate-400">
+                        <div class="w-16 h-16 border-4 border-slate-700 rounded-full spinner mb-4"></div>
+                        <p>Loading products...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase SDK and Script logic -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getAuth, signOut, onAuthStateChanged, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        import { getFirestore, collection, onSnapshot, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        // Your Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHe-cH8CbonOuHOy0RpHSx86jWNwKR42M",
+            authDomain: "asiet-store.firebaseapp.com",
+            projectId: "asiet-store",
+            storageBucket: "asiet-store.firebasestorage.app",
+            messagingSenderId: "618449805194",
+            appId: "1:618449805194:web:e23310a335bd49aacab273",
+            measurementId: "G-X04FWKQBQR"
+        };
+
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let allProducts = [];
+        let filteredProducts = [];
+
+        // Check authentication and load user profile
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                window.location.href = 'index.html';
+            } else {
+                try {
+                    const studentDoc = await getDoc(doc(db, 'students', user.uid));
+                    if (studentDoc.exists()) {
+                        const studentData = studentDoc.data();
+                        document.getElementById('welcomeMessage').textContent = `🎓 Welcome, ${studentData.name}! - ASIET-Store`;
+                    } else {
+                        const displayName = user.email.split('@')[0];
+                        document.getElementById('welcomeMessage').textContent = `🎓 Welcome, ${displayName}! - ASIET-Store`;
+                    }
+                } catch (error) {
+                    console.log('Could not load student profile:', error);
+                    const displayName = user.email.split('@')[0];
+                    document.getElementById('welcomeMessage').textContent = `🎓 Welcome, ${displayName}! - ASIET-Store`;
+                }
+            }
+        });
+
+        // Logout function
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('Error signing out:', error);
+            }
+        });
+
+        // Load products from Firestore in real-time
+        function loadProducts() {
+            const loading = document.getElementById('loadingIndicator');
+            onSnapshot(collection(db, 'products'), (snapshot) => {
+                loading.style.display = 'none';
+                allProducts = [];
+                snapshot.forEach((doc) => {
+                    allProducts.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                applyFiltersAndDisplay();
+            });
+        }
+
+        function applyFiltersAndDisplay() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const stockFilter = document.getElementById('stockFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            // Filter products
+            filteredProducts = allProducts.filter(product => {
+                const matchesSearch = product.name.toLowerCase().includes(searchTerm);
+                let matchesStock = true;
+                if (stockFilter === 'available') {
+                    matchesStock = product.stock > 0;
+                } else if (stockFilter === 'out-of-stock') {
+                    matchesStock = product.stock === 0;
+                } else if (stockFilter === 'low-stock') {
+                    matchesStock = product.stock > 0 && product.stock <= 5;
+                }
+                return matchesSearch && matchesStock;
+            });
+
+            // Sort products
+            filteredProducts.sort((a, b) => {
+                switch (sortBy) {
+                    case 'price':
+                        return a.price - b.price;
+                    case 'price-desc':
+                        return b.price - a.price;
+                    case 'stock':
+                        return a.stock - b.stock;
+                    case 'stock-desc':
+                        return b.stock - a.stock;
+                    default:
+                        // No sorting if no specific option is selected.
+                        return 0;
+                }
+            });
+
+            displayProducts();
+            updateProductCount();
+        }
+
+        function displayProducts() {
+            const productsGrid = document.getElementById('productsGrid');
+            productsGrid.innerHTML = '';
+
+            if (filteredProducts.length === 0) {
+                productsGrid.innerHTML = '<div class="col-span-full text-center p-8 text-slate-400">No products found matching your criteria.</div>';
+                return;
+            }
+
+            filteredProducts.forEach(product => {
+                const stockStatus = getStockStatus(product.stock);
+                const stockPercentage = Math.min((product.stock / 20) * 100, 100);
+                
+                productsGrid.innerHTML += `
+                    <div class="product-card bg-white rounded-xl shadow-lg p-6 border-2 ${stockStatus.cardBorder} relative">
+                        <div class="absolute top-4 right-4 text-xs font-bold px-3 py-1 rounded-full ${stockStatus.badgeBg} ${stockStatus.badgeText}">${stockStatus.text}</div>
+                        <h3 class="text-xl font-semibold mb-1 text-gray-800">${product.name}</h3>
+                        <p class="text-gray-600 mb-4 h-12 overflow-hidden">${product.description}</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold text-blue-600">₹${product.price.toFixed(2)}</span>
+                            <span class="text-sm text-gray-500">In stock: ${product.stock}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+                            <div class="h-2.5 rounded-full ${stockStatus.fillClass}" style="width: ${stockPercentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function getStockStatus(stock) {
+            if (stock === 0) {
+                return { text: 'Out of Stock', cardBorder: 'border-red-500', badgeBg: 'bg-red-100', badgeText: 'text-red-800', fillClass: 'bg-red-500' };
+            } else if (stock <= 5) {
+                return { text: 'Low Stock', cardBorder: 'border-yellow-500', badgeBg: 'bg-yellow-100', badgeText: 'text-yellow-800', fillClass: 'bg-yellow-500' };
+            } else {
+                return { text: 'In Stock', cardBorder: 'border-green-500', badgeBg: 'bg-green-100', badgeText: 'text-green-800', fillClass: 'bg-green-500' };
+            }
+        }
+
+        function updateProductCount() {
+            const productCount = document.getElementById('productCount');
+            const total = allProducts.length;
+            const showing = filteredProducts.length;
+
+            if (total === showing) {
+                productCount.textContent = `${total} Products`;
+            } else {
+                productCount.textContent = `${showing} of ${total} Products`;
+            }
+        }
+
+        // Event listeners for filters
+        document.getElementById('searchInput').addEventListener('input', applyFiltersAndDisplay);
+        document.getElementById('stockFilter').addEventListener('change', applyFiltersAndDisplay);
+        document.getElementById('sortBy').addEventListener('change', applyFiltersAndDisplay);
+
+        // Initialize
+        loadProducts();
+    </script>
+</body>
+</html>

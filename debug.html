@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login Debug</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white flex items-center justify-center min-h-screen p-4">
+    <div class="container bg-slate-800 rounded-2xl shadow-2xl p-8 max-w-3xl w-full">
+        <h1 class="text-3xl font-bold mb-2 text-center">🔧 Admin Login Debug Tool</h1>
+        <p class="text-slate-400 text-center mb-6">This tool will help diagnose admin login issues step by step.</p>
+
+        <div id="initStatus" class="bg-gray-700 text-gray-200 p-4 rounded-lg mb-4 text-center font-semibold">
+            🔄 Initializing Firebase...
+        </div>
+
+        <!-- Step 1: User Management -->
+        <div class="step bg-slate-700 p-6 rounded-xl border-l-4 border-indigo-500 mb-6">
+            <h3 class="text-xl font-bold mb-4">Step 1: Test & Create Users</h3>
+            <div class="login-form space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-slate-300 mb-1">Email:</label>
+                    <input type="email" id="email" value="" placeholder="Enter email" class="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-300 mb-1">Password:</label>
+                    <input type="password" id="password" value="" placeholder="Enter password" class="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex flex-wrap gap-4 pt-2">
+                    <button onclick="testLogin()" id="loginBtn" class="flex-1 py-3 text-white text-lg font-semibold rounded-lg shadow-md transition-all duration-300 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500">Test Login</button>
+                    <button onclick="createStudentUser()" id="createStudentBtn" class="flex-1 py-3 text-white text-lg font-semibold rounded-lg shadow-md transition-all duration-300 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-500">Create Student User</button>
+                    <button onclick="createAdminUser()" id="createAdminBtn" class="flex-1 py-3 text-white text-lg font-semibold rounded-lg shadow-md transition-all duration-300 bg-red-600 hover:bg-red-700 disabled:bg-gray-500">Create Admin User</button>
+                </div>
+            </div>
+            <div id="loginResult" class="mt-4"></div>
+        </div>
+
+        <!-- Step 2: Diagnostics -->
+        <div class="step bg-slate-700 p-6 rounded-xl border-l-4 border-blue-500 mb-6">
+            <h3 class="text-xl font-bold mb-4">Step 2: Diagnostics</h3>
+            <div class="flex flex-wrap gap-4">
+                <button onclick="checkFirebaseConfig()" class="flex-1 py-3 text-white text-lg font-semibold rounded-lg shadow-md transition-all duration-300 bg-gray-600 hover:bg-gray-700">Check Config</button>
+                <button onclick="checkAuthService()" class="flex-1 py-3 text-white text-lg font-semibold rounded-lg shadow-md transition-all duration-300 bg-gray-600 hover:bg-gray-700">Check Auth</button>
+                <button onclick="checkFirestoreService()" class="flex-1 py-3 text-white text-lg font-semibold rounded-lg shadow-md transition-all duration-300 bg-gray-600 hover:bg-gray-700">Check Firestore</button>
+            </div>
+            <div id="diagnosticsResult" class="mt-4"></div>
+        </div>
+        
+        <!-- Step 3: Debug Information -->
+        <div class="step bg-slate-700 p-6 rounded-xl border-l-4 border-emerald-500">
+            <h3 class="text-xl font-bold mb-4">Step 3: Debug Information</h3>
+            <div id="debugInfo" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK and Script logic -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import {
+            getAuth,
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            onAuthStateChanged
+        } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        import {
+            getFirestore,
+            collection,
+            getDocs,
+            doc,
+            setDoc
+        } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        // Your actual Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHe-cH8CbonOuHOy0RpHSx86jWNwKR42M",
+            authDomain: "asiet-store.firebaseapp.com",
+            projectId: "asiet-store",
+            storageBucket: "asiet-store.firebasestorage.app",
+            messagingSenderId: "618449805194",
+            appId: "1:618449805194:web:e23310a335bd49aacab273",
+            measurementId: "G-X04FWKQBQR"
+        };
+
+        let app, auth, db;
+        let currentUser = null;
+
+        // Initialize Firebase
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            document.getElementById('initStatus').innerHTML = '<span class="text-green-500">✅</span> Firebase initialized successfully!';
+            document.getElementById('initStatus').classList.remove('bg-gray-700');
+            document.getElementById('initStatus').classList.add('bg-green-800');
+
+            // Listen for auth state changes
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) {
+                    document.getElementById('debugInfo').innerHTML += `
+                        <div class="bg-green-700 p-3 rounded-md">
+                            <span class="text-green-300">✅</span> User authenticated: ${user.email} (UID: ${user.uid})
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('debugInfo').innerHTML += `
+                        <div class="bg-yellow-700 p-3 rounded-md">
+                            <span class="text-yellow-300">⚠️</span> No user currently authenticated
+                        </div>
+                    `;
+                }
+            });
+
+        } catch (error) {
+            document.getElementById('initStatus').innerHTML = `<span class="text-red-500">❌</span> Firebase initialization failed: ${error.message}`;
+            document.getElementById('initStatus').classList.remove('bg-gray-700');
+            document.getElementById('initStatus').classList.add('bg-red-800');
+        }
+
+        window.testLogin = async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('loginResult');
+            const loginBtn = document.getElementById('loginBtn');
+
+            if (!email || !password) {
+                resultDiv.innerHTML = '<div class="bg-red-700 p-3 rounded-md"><span class="text-red-300">❌</span> Please enter both email and password</div>';
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Testing...';
+            resultDiv.innerHTML = '<div class="bg-blue-700 p-3 rounded-md"><span class="text-blue-300">🔄</span> Attempting login...</div>';
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                resultDiv.innerHTML = `
+                    <div class="bg-green-700 p-3 rounded-md">
+                        <span class="text-green-300">✅</span> Login successful!
+                        <br>Email: ${user.email}
+                        <br>UID: ${user.uid}
+                    </div>
+                `;
+
+                const userDocRef = doc(db, 'students', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists()) {
+                    resultDiv.innerHTML += `
+                        <div class="bg-green-700 p-3 rounded-md mt-2">
+                            <span class="text-green-300">✅</span> Firestore document found. Role: ${userDocSnap.data().role}.
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML += `
+                        <div class="bg-yellow-700 p-3 rounded-md mt-2">
+                            <span class="text-yellow-300">⚠️</span> Firestore document NOT found.
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="bg-red-700 p-3 rounded-md">
+                        <span class="text-red-300">❌</span> Login failed: ${error.code}
+                        <br>Message: ${error.message}
+                    </div>
+                `;
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Test Login';
+            }
+        }
+
+        window.createStudentUser = async function() {
+            const resultDiv = document.getElementById('loginResult');
+            const email = document.getElementById('email').value || 'test_student@college.com';
+            const password = document.getElementById('password').value || 'student123';
+
+            resultDiv.innerHTML = '<div class="bg-blue-700 p-3 rounded-md">🔄 Creating student user...</div>';
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                await setDoc(doc(db, 'students', user.uid), {
+                    name: 'Test Student',
+                    email: email,
+                    studentId: 'AS-001',
+                    role: 'student',
+                    registrationDate: new Date(),
+                });
+
+                resultDiv.innerHTML = `
+                    <div class="bg-green-700 p-3 rounded-md">
+                        <span class="text-green-300">✅</span> Student user created successfully!
+                        <br>Email: ${email}
+                        <br>Password: ${password}
+                        <br>UID: ${user.uid}
+                    </div>
+                `;
+            } catch (error) {
+                if (error.code === 'auth/email-already-in-use') {
+                    resultDiv.innerHTML = `
+                        <div class="bg-yellow-700 p-3 rounded-md">
+                            <span class="text-yellow-300">⚠️</span> Student user already exists!
+                            <br>Try logging in with: ${email} / ${password}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="bg-red-700 p-3 rounded-md">
+                            <span class="text-red-300">❌</span> Failed to create student user: ${error.code}
+                            <br>Message: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        window.createAdminUser = async function() {
+            const resultDiv = document.getElementById('loginResult');
+            const email = document.getElementById('email').value || 'test_admin@college.com';
+            const password = document.getElementById('password').value || 'admin123';
+
+            resultDiv.innerHTML = '<div class="bg-blue-700 p-3 rounded-md">🔄 Creating admin user...</div>';
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                await setDoc(doc(db, 'students', user.uid), {
+                    name: 'Admin User',
+                    email: email,
+                    studentId: 'AS-ADMIN',
+                    role: 'admin',
+                    createdAt: new Date()
+                });
+
+                resultDiv.innerHTML = `
+                    <div class="bg-green-700 p-3 rounded-md">
+                        <span class="text-green-300">✅</span> Admin user created successfully!
+                        <br>Email: ${email}
+                        <br>Password: ${password}
+                        <br>UID: ${user.uid}
+                    </div>
+                `;
+            } catch (error) {
+                if (error.code === 'auth/email-already-in-use') {
+                    resultDiv.innerHTML = `
+                        <div class="bg-yellow-700 p-3 rounded-md">
+                            <span class="text-yellow-300">⚠️</span> Admin user already exists!
+                            <br>Try logging in with: ${email} / ${password}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="bg-red-700 p-3 rounded-md">
+                            <span class="text-red-300">❌</span> Failed to create admin user: ${error.code}
+                            <br>Message: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        window.checkFirebaseConfig = function() {
+            const resultDiv = document.getElementById('diagnosticsResult');
+            const config = firebaseConfig;
+
+            let issues = [];
+            if (config.apiKey === 'your-api-key') issues.push('API Key not updated');
+            if (config.authDomain.includes('your-project')) issues.push('Auth Domain not updated');
+            if (config.projectId === 'your-project-id') issues.push('Project ID not updated');
+
+            if (issues.length > 0) {
+                resultDiv.innerHTML = `
+                    <div class="bg-red-700 p-3 rounded-md">
+                        <span class="text-red-300">❌</span> Firebase Configuration Issues:
+                        <ul class="list-disc pl-5 mt-2">${issues.map(issue => `<li>${issue}</li>`).join('')}</ul>
+                        <p class="mt-2 text-sm text-red-300"><strong>Solution:</strong> Update your Firebase config with real values from Firebase Console.</p>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="bg-green-700 p-3 rounded-md">
+                        <span class="text-green-300">✅</span> Firebase configuration looks good!
+                        <p class="mt-2 text-sm">Project ID: ${config.projectId}</p>
+                        <p class="text-sm">Auth Domain: ${config.authDomain}</p>
+                    </div>
+                `;
+            }
+        }
+
+        window.checkAuthService = async function() {
+            const resultDiv = document.getElementById('diagnosticsResult');
+
+            try {
+                const user = auth.currentUser;
+                resultDiv.innerHTML = `
+                    <div class="bg-green-700 p-3 rounded-md">
+                        <span class="text-green-300">✅</span> Authentication service is working
+                        <p class="mt-2 text-sm">Current user: ${user ? user.email : 'None'}</p>
+                        <p class="text-sm">Auth instance: ${auth ? 'Connected' : 'Not connected'}</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="bg-red-700 p-3 rounded-md">
+                        <span class="text-red-300">❌</span> Authentication service error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        window.checkFirestoreService = async function() {
+            const resultDiv = document.getElementById('diagnosticsResult');
+
+            try {
+                const snapshot = await getDocs(collection(db, 'products'));
+                resultDiv.innerHTML = `
+                    <div class="bg-green-700 p-3 rounded-md">
+                        <span class="text-green-300">✅</span> Firestore service is working
+                        <p class="mt-2 text-sm">Products collection: ${snapshot.size} documents</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="bg-red-700 p-3 rounded-md">
+                        <span class="text-red-300">❌</span> Firestore service error: ${error.code}
+                        <br>Message: ${error.message}
+                        <p class="mt-2 text-sm text-red-300">
+                            <strong>Common fixes:</strong>
+                            <ul class="list-disc pl-5">
+                                <li>Make sure Firestore is enabled in Firebase Console</li>
+                                <li>Check Firestore security rules</li>
+                                <li>Ensure you're authenticated</li>
+                            </ul>
+                        </p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
